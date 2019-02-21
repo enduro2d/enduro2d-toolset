@@ -1,0 +1,3 @@
+[submodule "model_converter/modules/assimp"]
+	path = model_converter/modules/assimp
+	url = https://github.com/assimp/assimp/
