@@ -29,7 +29,7 @@ $ cmake --build . -- -j8
 
 ```bash
 $ cd your_toolset_build_directory
-$ ./model_converter/model_converter
+$ ./model_converter/model2mesh
 ```
 
 ## * Links

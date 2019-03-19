@@ -24,8 +24,8 @@
 
 namespace
 {
-    const std::uint32_t mesh_file_version = 1;
-    const std::string mesh_file_signature = "e2d_mesh";
+    const std::uint32_t shape_file_version = 1;
+    const std::string shape_file_signature = "e2d_shape";
 
     struct opts {
         bool timers = false;
@@ -69,25 +69,12 @@ namespace
         : x(nx), y(ny) {}
     };
 
-    struct v3f {
-        float x = 0.f;
-        float y = 0.f;
-        float z = 0.f;
-
-        v3f(float nx, float ny, float nz)
-        : x(nx), y(ny), z(nz) {}
-    };
-
-    struct mesh {
-        std::vector<v3f> vertices;
+    struct shape {
+        std::vector<v2f> vertices;
         std::vector<std::uint32_t> indices;
 
         std::vector<std::vector<v2f>> uvs_channels;
         std::vector<std::vector<std::uint32_t>> colors_channels;
-
-        std::vector<v3f> normals;
-        std::vector<v3f> tangents;
-        std::vector<v3f> bitangents;
     };
 
     template < typename T >
@@ -133,40 +120,31 @@ namespace
         return 0;
     }
 
-    bool validate_mesh(const mesh& mesh) noexcept {
-        if ( mesh.vertices.empty() ) {
+    bool validate_shape(const shape& shape) noexcept {
+        if ( shape.vertices.empty() ) {
             return false;
         }
-        if ( mesh.indices.empty() ) {
+        if ( shape.indices.empty() ) {
             return false;
         }
-        for ( const auto& uvs : mesh.uvs_channels ) {
-            if ( uvs.size() != mesh.vertices.size() ) {
+        for ( const auto& uvs : shape.uvs_channels ) {
+            if ( uvs.size() != shape.vertices.size() ) {
                 return false;
             }
         }
-        for ( const auto& colors : mesh.colors_channels ) {
-            if ( colors.size() != mesh.vertices.size() ) {
+        for ( const auto& colors : shape.colors_channels ) {
+            if ( colors.size() != shape.vertices.size() ) {
                 return false;
             }
-        }
-        if ( !mesh.normals.empty() && mesh.normals.size() != mesh.vertices.size() ) {
-            return false;
-        }
-        if ( !mesh.tangents.empty() && mesh.tangents.size() != mesh.vertices.size() ) {
-            return false;
-        }
-        if ( !mesh.bitangents.empty() && mesh.bitangents.size() != mesh.vertices.size() ) {
-            return false;
         }
         return true;
     }
 
-    bool save_mesh(const mesh& mesh, const std::string& out_path, const opts& opts) {
+    bool save_shape(const shape& shape, const std::string& out_path, const opts& opts) {
         timer save_timer;
 
-        if ( !validate_mesh(mesh) ) {
-            std::cerr << "Failed to validate out mesh: " << out_path << std::endl;
+        if ( !validate_shape(shape) ) {
+            std::cerr << "Failed to validate out shape: " << out_path << std::endl;
             return false;
         }
 
@@ -176,35 +154,27 @@ namespace
             return false;
         }
 
-        write_str_to_ofstream(stream, mesh_file_signature);
-        write_u32_to_ofstream(stream, mesh_file_version);
+        write_str_to_ofstream(stream, shape_file_signature);
+        write_u32_to_ofstream(stream, shape_file_version);
 
-        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(mesh.vertices.size()));
-        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(mesh.indices.size()));
+        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(shape.vertices.size()));
+        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(shape.indices.size()));
 
-        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(mesh.uvs_channels.size()));
-        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(mesh.colors_channels.size()));
+        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(shape.uvs_channels.size()));
+        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(shape.colors_channels.size()));
 
-        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(mesh.normals.size()));
-        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(mesh.tangents.size()));
-        write_u32_to_ofstream(stream, static_cast<std::uint32_t>(mesh.bitangents.size()));
-
-        std::size_t vertices_bytes = write_vector_to_ofstream(stream, mesh.vertices);
-        std::size_t indices_bytes = write_vector_to_ofstream(stream, mesh.indices);
+        std::size_t vertices_bytes = write_vector_to_ofstream(stream, shape.vertices);
+        std::size_t indices_bytes = write_vector_to_ofstream(stream, shape.indices);
 
         std::size_t uvs_bytes = 0;
-        for ( const auto& uvs : mesh.uvs_channels ) {
+        for ( const auto& uvs : shape.uvs_channels ) {
             uvs_bytes += write_vector_to_ofstream(stream, uvs);
         }
 
         std::size_t colors_bytes = 0;
-        for ( const auto& colors : mesh.colors_channels ) {
+        for ( const auto& colors : shape.colors_channels ) {
             colors_bytes += write_vector_to_ofstream(stream, colors);
         }
-
-        std::size_t normals_bytes = write_vector_to_ofstream(stream, mesh.normals);
-        std::size_t tangents_bytes = write_vector_to_ofstream(stream, mesh.tangents);
-        std::size_t bitangents_bytes = write_vector_to_ofstream(stream, mesh.bitangents);
 
         if ( opts.timers ) {
             std::cout << "> save mesh: ";
@@ -216,44 +186,41 @@ namespace
             std::cout
                 << std::endl
                 << "> mesh info:" << std::endl
-                << "-> vertices: " << mesh.vertices.size() << ", " << vertices_bytes << " B" << std::endl
-                << "-> indices: " << mesh.indices.size() << ", " << indices_bytes << " B" << std::endl
-                << "-> uvs: " << mesh.uvs_channels.size() << ", " << uvs_bytes << " B" << std::endl
-                << "-> colors: " << mesh.colors_channels.size() << ", " << colors_bytes << " B" << std::endl
-                << "-> normals: " << mesh.normals.size() << ", " << normals_bytes << " B" << std::endl
-                << "-> tangents: " << mesh.tangents.size() << ", " << tangents_bytes << " B" << std::endl
-                << "-> bitangents: " << mesh.bitangents.size() << ", " << bitangents_bytes << " B" << std::endl;
+                << "-> vertices: " << shape.vertices.size() << ", " << vertices_bytes << " B" << std::endl
+                << "-> indices: " << shape.indices.size() << ", " << indices_bytes << " B" << std::endl
+                << "-> uvs: " << shape.uvs_channels.size() << ", " << uvs_bytes << " B" << std::endl
+                << "-> colors: " << shape.colors_channels.size() << ", " << colors_bytes << " B" << std::endl;
         }
 
         return true;
     }
 
-    bool convert_mesh(const aiMesh* ai_mesh, const std::string& out_path, const opts& opts) {
-        mesh out_mesh;
+    bool convert_shape(const aiMesh* ai_mesh, const std::string& out_path, const opts& opts) {
+        shape out_shape;
         timer convert_timer;
 
         if ( ai_mesh->HasPositions() ) {
-            out_mesh.vertices.reserve(ai_mesh->mNumVertices);
+            out_shape.vertices.reserve(ai_mesh->mNumVertices);
             std::transform(
                 ai_mesh->mVertices,
                 ai_mesh->mVertices + ai_mesh->mNumVertices,
-                std::back_inserter(out_mesh.vertices),
+                std::back_inserter(out_shape.vertices),
                 [](const aiVector3D& v) noexcept {
-                    return v3f{v.x, v.y, v.z};
+                    return v2f{v.x, v.y};
                 });
         }
 
         if ( ai_mesh->HasFaces() ) {
-            out_mesh.indices.reserve(ai_mesh->mNumFaces * 3u);
+            out_shape.indices.reserve(ai_mesh->mNumFaces * 3u);
             std::for_each(
                 ai_mesh->mFaces,
                 ai_mesh->mFaces + ai_mesh->mNumFaces,
-                [&out_mesh](const aiFace& f) {
+                [&out_shape](const aiFace& f) {
                     if ( f.mNumIndices != 3 ) {
                         throw std::logic_error("invalide face index count");
                     }
-                    out_mesh.indices.insert(
-                        out_mesh.indices.end(),
+                    out_shape.indices.insert(
+                        out_shape.indices.end(),
                         f.mIndices,
                         f.mIndices + f.mNumIndices);
                 });
@@ -269,7 +236,7 @@ namespace
                 [](const aiVector3D& v) noexcept {
                     return v2f{v.x, v.y};
                 });
-            out_mesh.uvs_channels.emplace_back(std::move(uvs));
+            out_shape.uvs_channels.emplace_back(std::move(uvs));
         }
 
         for ( unsigned int channel = 0; channel < ai_mesh->GetNumColorChannels(); ++channel ) {
@@ -282,47 +249,16 @@ namespace
                 [](const aiColor4D& v) noexcept {
                     return pack_color(v.r, v.g, v.b, v.a);
                 });
-            out_mesh.colors_channels.emplace_back(std::move(colors));
-        }
-
-        if ( ai_mesh->HasNormals() ) {
-            out_mesh.normals.reserve(ai_mesh->mNumVertices);
-            std::transform(
-                ai_mesh->mNormals,
-                ai_mesh->mNormals + ai_mesh->mNumVertices,
-                std::back_inserter(out_mesh.normals),
-                [](const aiVector3D& v) noexcept {
-                    return v3f{v.x, v.y, v.z};
-                });
-        }
-
-        if ( ai_mesh->HasTangentsAndBitangents() ) {
-            out_mesh.tangents.reserve(ai_mesh->mNumVertices);
-            std::transform(
-                ai_mesh->mTangents,
-                ai_mesh->mTangents + ai_mesh->mNumVertices,
-                std::back_inserter(out_mesh.tangents),
-                [](const aiVector3D& v) noexcept {
-                    return v3f{v.x, v.y, v.z};
-                });
-
-            out_mesh.bitangents.reserve(ai_mesh->mNumVertices);
-            std::transform(
-                ai_mesh->mBitangents,
-                ai_mesh->mBitangents + ai_mesh->mNumVertices,
-                std::back_inserter(out_mesh.bitangents),
-                [](const aiVector3D& v) noexcept {
-                    return v3f{v.x, v.y, v.z};
-                });
+            out_shape.colors_channels.emplace_back(std::move(colors));
         }
 
         if ( opts.timers ) {
-            std::cout << std::endl << "> convert mesh: ";
+            std::cout << std::endl << "> convert shape: ";
             convert_timer.done();
             std::cout << " - " << out_path << std::endl;
         }
 
-        return save_mesh(out_mesh, out_path, opts);
+        return save_shape(out_shape, out_path, opts);
     }
 
     bool convert(const std::string& path, const opts& opts) {
@@ -359,26 +295,26 @@ namespace
         for ( unsigned int mesh_index = 0; mesh_index < scene->mNumMeshes; ++mesh_index ) {
             const aiMesh* mesh = scene->mMeshes[mesh_index];
 
-            const std::string mesh_name = mesh->mName.length
+            const std::string shape_name = mesh->mName.length
                 ? mesh->mName.C_Str()
-                : "mesh_" + std::to_string(mesh_index);
+                : "shape_" + std::to_string(mesh_index);
 
-            std::string mesh_out_path = std::string()
+            std::string shape_out_path = std::string()
                 .append(path)
                 .append(".")
-                .append(mesh_name)
-                .append(".e2d_mesh");
+                .append(shape_name)
+                .append(".e2d_shape");
 
             if ( opts.verbose ) {
                 std::cout
                     << std::endl
-                    << ">> Mesh("
-                    << mesh_name
+                    << ">> Shape("
+                    << shape_name
                     << ") converting..."
                     << std::endl;
             }
 
-            if ( !convert_mesh(mesh, mesh_out_path, opts) ) {
+            if ( !convert_shape(mesh, shape_out_path, opts) ) {
                 std::cerr << "Failed!" << std::endl;
                 return false;
             }
@@ -399,7 +335,7 @@ namespace
 
 int main(int argc, char *argv[]) {
     if ( argc < 2 ) {
-        std::cout << "USAGE: model_converter mesh.obj" << std::endl;
+        std::cout << "USAGE: model2shape mesh.obj" << std::endl;
         return 0;
     }
     return convert(argv[1], opts(argc, argv)) ? 0 : 1;
